@@ -14,6 +14,6 @@ std::ostream & operator << (std::ostream & out,const parameters & p)
   out<<"hc= "<<p.hc<<"\n";
   out<<"M= "<<p.M<<"\n\n";
   out<<"Namefile= "<<p.Namefile<<"\n\n";
-  //out<<"Norm= "<<p.Norm<<"\n\n";
+
   return out;
 }
