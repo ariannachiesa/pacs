@@ -4,6 +4,7 @@
 #include <tuple>
 #include "readParameters.hpp"
 #include "GetPot.hpp"
+#include "tridiagonal.hpp"
 //#include "gnuplot-iostream.hpp"// interface with gnuplot
 /*!
   @file main.cpp
@@ -63,7 +64,6 @@ int main(int argc, char** argv)
   const auto& hc=param.hc; // Convection coefficient
   const auto& M=param.M; // Number of grid elements
   const auto& Namefile=param.Namefile; // Name of the output file
-  //const auto& Norm=param.Norm; // Norm for the stop criterion
   
   //! Precomputed coefficient for adimensional form of equation
   const auto act=2.*(a1+a2)*hc*L*L/(k*a1*a2);
@@ -73,54 +73,23 @@ int main(int argc, char** argv)
   
   // Solution vector
   std::vector<double> theta(M+1);
-  
-  // Gauss Siedel is initialised with a linear variation
-  // of T
-  
-  for(unsigned int m=0;m <= M;++m)
-     theta[m]=(1.-m*h)*(To-Te)/Te;
-  
-  // Gauss-Seidel
-  // epsilon=||x^{k+1}-x^{k}||
-  // Stopping criteria epsilon<=toler
-  
-  int iter=0;
-  double xnew, epsilon;
-     do
-       { epsilon=0.;
 
-	 // first M-1 row of linear system
-         for(int m=1;m < M;m++)
-         {   
-	   xnew  = (theta[m-1]+theta[m+1])/(2.+h*h*act);
-	   epsilon += (xnew-theta[m])*(xnew-theta[m]);
-	   theta[m] = xnew;
-         }
+  // Thomas algorithm  
+  std::vector<double> diag(M,2+h*h*act) ;
+  std::vector<double> up(M-1,-1);
+  std::vector<double> down(M-1,-1);
+  std::vector<double> b(M,0);
+  b[0] = (To-Te)/Te ;
+  diag[M-1] = 1 ;
 
-	 //Last row
-	 xnew = theta[M-1]; 
-	 epsilon += (xnew-theta[M])*(xnew-theta[M]);
-	 theta[M]=  xnew; 
-	/*
-	if(!Norm){
-		toler = abs(epsilon) ; // Norma L2	
-	}
-	else{
-		toler = abs(epsilon)+ // Norma H1	
-	}
-	*/
+  tridiagonal_matrix mat(M,diag,up,down);
+  mat.thomas_factorize();
+  auto x = mat.thomas_solve(b);
 
-	 iter=iter+1;     
-       }while((sqrt(epsilon) > toler) && (iter < itermax) );
-
-    if(iter<itermax)
-      cout << "M="<<M<<"  Convergence in "<<iter<<" iterations"<<endl;
-    else
-      {
-	cerr << "NOT CONVERGING in "<<itermax<<" iterations "<<
-	  "||dx||="<<sqrt(epsilon)<<endl;
-	status=1;
-      }
+  theta[0] = (To-Te)/Te ;
+  for(int i=0; i<x.size(); i++){
+    theta[i+1] = x[i];
+  }
 
  // Analitic solution
 
@@ -131,13 +100,13 @@ int main(int argc, char** argv)
      // writing results with format
      // x_i u_h(x_i) u(x_i) and lauch gnuplot 
 
-     // Gnuplot gp;
+     //Gnuplot gp;
      std::vector<double> coor(M+1);
      std::vector<double> sol(M+1);
      std::vector<double> exact(M+1);
 
-     cout<<"Result file: Namefile.dat"<<endl;
-     ofstream f("Namefile.dat");
+     cout<<"Result file: "<<Namefile<<endl;
+     ofstream f(Namefile);
      for(int m = 0; m<= M; m++)
        {
 	 // \t writes a tab 
